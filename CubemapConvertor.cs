@@ -23,7 +23,7 @@ public class CubemapConvertor : EditorWindow
     
     enum DirectionModel
     {
-        Font = 0,
+        Front = 0,
         Back = 1,
         Top = 2,
     }
@@ -42,7 +42,7 @@ public class CubemapConvertor : EditorWindow
     RenderTexture renderTexture;
     private Model mod = Model.Sphere;
     private MappingScale mappingScale = MappingScale.Default;
-    private DirectionModel directionMod = DirectionModel.Font;
+    private DirectionModel directionMod = DirectionModel.Front;
     private EquirectangularModel equirectangularModel = EquirectangularModel.Defualt;
     private string dataPath = "";
     private float sphereRadius;
