@@ -2,7 +2,7 @@
 
 ![](images~/window.png)
 
-| **sphere**              | **equirectangular**              |
-|-------------------------|----------------------------------|
-| ![](images~/sphere.png) | ![](images~/equirectangular.png) |
+| **sphere**              | **equirectangular**              | **oct**              |
+|-------------------------|----------------------------------|----------------------|
+| ![](images~/sphere.png) | ![](images~/equirectangular.png) | ![](images~/oct.png) |
 

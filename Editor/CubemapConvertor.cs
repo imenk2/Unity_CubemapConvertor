@@ -1,17 +1,16 @@
-using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
 
 public class CubemapConvertor : EditorWindow
 {
     enum Model
     {
-        Sphere = 0,
-        Equirectangular = 1
+        CircularCone = 0,
+        Equirectangular = 1,
+        ConcentricOctahedral = 2
     }
     
     enum MappingScale
@@ -34,20 +33,32 @@ public class CubemapConvertor : EditorWindow
         Defualt = 0,
         Top = 1
     }
+
+    enum octModel
+    {
+        octSphere = 0,
+        concentricSphere = 1
+    }
     
     private Texture cubeObject;
     public Texture2D saveTexture;
     private Material mat;
     private static int size = 1024;
     RenderTexture renderTexture;
-    private Model mod = Model.Sphere;
+    private Model mod = Model.CircularCone;
     private MappingScale mappingScale = MappingScale.Default;
     private DirectionModel directionMod = DirectionModel.Front;
     private EquirectangularModel equirectangularModel = EquirectangularModel.Defualt;
+    private octModel _octModel = octModel.octSphere;
     private string dataPath = "";
     private float sphereRadius;
     private bool isGamma;
-    
+    private static readonly int MainTex = Shader.PropertyToID("_MainTex");
+    private static readonly int EquirectangularModel1 = Shader.PropertyToID("_EquirectangularModel");
+    private static readonly int SpheredirectionMode = Shader.PropertyToID("_SpheredirectionMode");
+    private static readonly int SpheremappingScale = Shader.PropertyToID("_SpheremappingScale");
+    private static readonly int OctModel = Shader.PropertyToID("_octModel");
+
     [MenuItem("Window/CubeMap Convertor")]
     public static void ShowWindow()
     {
@@ -64,9 +75,28 @@ public class CubemapConvertor : EditorWindow
         GUILayout.Label("输出模式选择", EditorStyles.boldLabel);
         mod = (Model)EditorGUILayout.EnumPopup("Pass", mod);
 
-        switch (mod)
+        DrawGenerateModel(mod);
+
+        GUILayout.Space(20);
+
+        if (GUILayout.Button("输出"))
         {
-            case Model.Sphere:
+            if (cubeObject != null)
+            {
+                CubeConvertSphere();
+            }
+            else
+            {
+                Debug.LogError("请指定Cube对象！");
+            }
+        }
+    }
+
+    void DrawGenerateModel(Model model)
+    {
+        switch (model)
+        {
+            case Model.CircularCone:
                 directionMod = (DirectionModel)EditorGUILayout.EnumPopup("Direction Mod", directionMod);
                 if (directionMod == DirectionModel.Top)
                 {
@@ -95,42 +125,35 @@ public class CubemapConvertor : EditorWindow
                     {
                         size = cubeObject.height / 2;
                     }
-
-                    switch (cubeObject.graphicsFormat)
-                    {
-                        case GraphicsFormat.RGB_ETC2_SRGB:
-                        case GraphicsFormat.RGBA_PVRTC_2Bpp_SRGB:
-                        case GraphicsFormat.RGBA_BC7_SRGB:
-                        case GraphicsFormat.RGBA_DXT5_SRGB:
-                        case GraphicsFormat.RGBA_ASTC4X4_SRGB:
-                        case GraphicsFormat.RGBA_ASTC5X5_SRGB:
-                        case GraphicsFormat.RGBA_ASTC6X6_SRGB:
-                        case GraphicsFormat.RGBA_ASTC8X8_SRGB:
-                        case GraphicsFormat.R8G8B8A8_SRGB:
-                            isGamma = true;
-                            break;
-                        default:
-                            isGamma = false;
-                            break;
-                    }
-                   
                 }
 
                 break;
+            case Model.ConcentricOctahedral:
+                _octModel = (octModel)EditorGUILayout.EnumPopup("octModel", _octModel);
+                break;
         }
+        
+        MapGamma(cubeObject.graphicsFormat);
+    }
 
-            GUILayout.Space(20);
-
-        if (GUILayout.Button("输出"))
+    void MapGamma(GraphicsFormat format)
+    {
+        switch (format)
         {
-            if (cubeObject != null)
-            {
-                CubeConvertSphere();
-            }
-            else
-            {
-                Debug.LogError("请指定Cube对象！");
-            }
+            case GraphicsFormat.RGB_ETC2_SRGB:
+            case GraphicsFormat.RGBA_PVRTC_2Bpp_SRGB:
+            case GraphicsFormat.RGBA_BC7_SRGB:
+            case GraphicsFormat.RGBA_DXT5_SRGB:
+            case GraphicsFormat.RGBA_ASTC4X4_SRGB:
+            case GraphicsFormat.RGBA_ASTC5X5_SRGB:
+            case GraphicsFormat.RGBA_ASTC6X6_SRGB:
+            case GraphicsFormat.RGBA_ASTC8X8_SRGB:
+            case GraphicsFormat.R8G8B8A8_SRGB:
+                isGamma = true;
+                break;
+            default:
+                isGamma = false;
+                break;
         }
     }
 
@@ -141,16 +164,19 @@ public class CubemapConvertor : EditorWindow
 
         switch (mod)
         {
-            case Model.Sphere:
-                mat.SetInt("_SpheremappingScale", (int)mappingScale);
-                mat.SetInt("_SpheredirectionMode", (int)directionMod);
+            case Model.CircularCone:
+                mat.SetInt(SpheremappingScale, (int)mappingScale);
+                mat.SetInt(SpheredirectionMode, (int)directionMod);
                 break;
             case Model.Equirectangular:
-                mat.SetInt("_EquirectangularModel", (int)equirectangularModel);
+                mat.SetInt(EquirectangularModel1, (int)equirectangularModel);
+                break;
+            case Model.ConcentricOctahedral:
+                mat.SetInt(OctModel, (int)_octModel);
                 break;
         }
         
-        mat.SetTexture("_MainTex", cubeObject);
+        mat.SetTexture(MainTex, cubeObject);
         Graphics.Blit(null, renderTexture, mat, (int)mod);
 
         SaveTexture();
@@ -186,9 +212,12 @@ public class CubemapConvertor : EditorWindow
 
         switch (mod)
         {
-            case Model.Sphere:
+            case Model.CircularCone:
+            case Model.ConcentricOctahedral:
+
                 if (renderTexture == null || renderTexture.width != size)
                 {
+                    if(renderTexture != null) Object.DestroyImmediate(renderTexture);
                     renderTexture = null;
                     renderTexture = new RenderTexture(size, size, 0); 
                     renderTexture.format = RenderTextureFormat.ARGBFloat;
@@ -199,6 +228,7 @@ public class CubemapConvertor : EditorWindow
                 }
                 if (saveTexture == null || saveTexture.width != size)
                 {
+                    if(saveTexture != null) Object.DestroyImmediate(saveTexture);
                     saveTexture = null;
                     saveTexture = new Texture2D(size, size, TextureFormat.ARGB32, false, !isGamma);
                 }
@@ -207,6 +237,7 @@ public class CubemapConvertor : EditorWindow
             case Model.Equirectangular:
                 if (renderTexture == null || renderTexture.width != cubeObject.width || renderTexture.height != size)
                 {
+                    if(renderTexture != null) Object.DestroyImmediate(renderTexture);
                     renderTexture = null;
 					//high减半
                     renderTexture = new RenderTexture(cubeObject.width, size, 0);
@@ -219,6 +250,7 @@ public class CubemapConvertor : EditorWindow
 
                 if (saveTexture == null || saveTexture.width != cubeObject.width || saveTexture.height != size)
                 {
+                    if(saveTexture != null) Object.DestroyImmediate(saveTexture);
                     saveTexture = null;
                     saveTexture = new Texture2D(cubeObject.width, size, TextureFormat.ARGB32, false, !isGamma);
                 }
