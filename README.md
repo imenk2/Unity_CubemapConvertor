@@ -1,6 +1,6 @@
 # Unity_CubemapConvertor
 
-![](images~/window.png)
+![](images~/windows.png) 
 
 | **sphere**              | **equirectangular**              | **oct**              |
 |-------------------------|----------------------------------|----------------------|
